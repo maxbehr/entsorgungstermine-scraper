@@ -33,8 +33,8 @@ def main():
     print "Anzahl Straßen: " + str(len(files))
 
     all_streets = []
-    print "Hole Straßeninformationen..."
     filename = files[0]
+    print "Hole Straßeninformationen für " + str(filename)
     #for filename in files:
     f = path + filename
 
@@ -63,14 +63,19 @@ def main():
             month_name = month_mapping[month_label]
             print month_name
 
+            print months[month_label]
+
+            # Create descriptions
+            months[month_label] = map(lambda day: dayMapping(day), months[month_label])
+
+            print '\n'
+
             month_obj = {
                 "month": month_name,
                 "values": months[month_label]
             }
 
             month_values.append(month_obj)
-
-        print month_values
 
         street['months'] = month_values
 
@@ -79,7 +84,18 @@ def main():
 
     # Write to summary file
     print "Schreibe Gesamtübersicht..."
-    write_summary(all_streets)
+    write_summary(street)
+
+def dayMapping(day):
+    d = {
+        "date": day['date'],
+        "descr": createDescriptionArray(day['descr'])
+    }
+    return d
+
+def createDescriptionArray(descrStr):
+    return descrStr.split(', ')
+
 
 def get_streetname(str):
     return ' '.join(str.split('.')[0].split(' ')[1:])
