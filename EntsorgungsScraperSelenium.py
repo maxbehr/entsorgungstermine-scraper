@@ -20,7 +20,7 @@ print "Script started..."
 url = 'https://potsdam.abfuhrkalender.de/default.aspx'
 months_btn_ids = ['btMCMonth1', 'btMCMonth2', 'btMCMonth3', 'btMCMonth4', 'btMCMonth5', 'btMCMonth6', 'btMCMonth7', 'btMCMonth8', 'btMCMonth9', 'btMCMonth10', 'btMCMonth11', 'btMCMonth12']
 
-PATH = "/Users/max/Desktop/Entsorgungstermine refac/streets/"
+PATH = "/Users/max/Developer/Abfallentsorgung/www_revamped/scraped_streets/"
 
 XPATH_SELECTORS = [
     '//*[@id="pnlMonthCalendarDays"]/div[@class="RowStandard"]',
