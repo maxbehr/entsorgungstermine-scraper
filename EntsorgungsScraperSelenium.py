@@ -6,6 +6,7 @@ import json
 import datetime
 import time
 from selenium import webdriver
+from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -14,11 +15,18 @@ from selenium.common.exceptions import StaleElementReferenceException
 import os
 import sys
 
+print "Script started..."
 
 url = 'https://potsdam.abfuhrkalender.de/default.aspx'
 months_btn_ids = ['btMCMonth1', 'btMCMonth2', 'btMCMonth3', 'btMCMonth4', 'btMCMonth5', 'btMCMonth6', 'btMCMonth7', 'btMCMonth8', 'btMCMonth9', 'btMCMonth10', 'btMCMonth11', 'btMCMonth12']
 
-PATH = "<PATH>"
+PATH = "/Users/max/Desktop/Entsorgungstermine refac/streets/"
+
+XPATH_SELECTORS = [
+    '//*[@id="pnlMonthCalendarDays"]/div[@class="RowStandard"]',
+    '//*[@id="pnlMonthCalendarDays"]/div[@class="RowStandard Postponed"]',
+    '//*[@id="pnlMonthCalendarDays"]/div[@class="RowStandard Holiday"]'
+]
 
 
 start_index = 0
@@ -30,8 +38,20 @@ current_year = datetime.datetime.now().year
 def scrape(start_index, last_index):
     try:
         global driver
-        driver = webdriver.Firefox()
+        #options = webdriver.FirefoxProfile()
+        os.environ['MOZ_HEADLESS'] = '1'
+        binary = FirefoxBinary('/Applications/Firefox Beta.app/Contents/MacOS/firefox', log_file=sys.stdout)
+        binary.add_command_line_options('-headless')
+        driver = webdriver.Firefox(firefox_binary=binary)
         driver.set_window_size(640, 480)
+
+        #options = webdriver.ChromeOptions()
+        #options.add_argument('headless')
+        # options.add_argument('--ignore-certificate-errors')
+        # options.add_argument("--test-type")
+        #options.add_argument('window-size=1200x600')
+        #options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        #driver = webdriver.Chrome(chrome_options=options)
 
         print "Start scraping with street_index " + str(start_index) + ", stop at index " + str(last_index) + " (inclusive)"
 
@@ -85,24 +105,39 @@ def scrape(start_index, last_index):
                 print "\t...scraping " + month
 
                 waiting()
-                rows = driver.find_elements_by_xpath('//*[@id="pnlMonthCalendarDays"]/div[@class="RowStandard"]')
 
                 arr = []
-                for row in rows:
-                    wd = row.find_element_by_class_name('Date1').text.encode('utf-8').strip()
-                    date = row.find_element_by_class_name('Date2').text.encode('utf-8').strip()
-                    descr = row.find_element_by_class_name('SymbolDescription').text.encode('utf-8').strip()
+                for index, xpath_selector in enumerate(XPATH_SELECTORS):
+                    rows = driver.find_elements_by_xpath(xpath_selector)
 
-                    if descr != '':
-                        year = current_year+1 if month_id < datetime.datetime.now().month else current_year
+                    for row in rows:
+                        wd = row.find_element_by_class_name('Date1').text.encode('utf-8').strip()
+                        date = row.find_element_by_class_name('Date2').text.encode('utf-8').strip()
 
-                        dic = {
-                            "date": str(datetime.date(year, month_id, int(date))),
-                            "wd": wd,
-                            "descr": descr
-                        }
+                        if index == 0:      # Default
+                            descr = row.find_element_by_class_name('SymbolDescription').text.encode('utf-8').strip()
+                            type = "default"
 
-                        arr.append(dic)
+                        elif index == 1:    # Postponed
+                            descr = row.find_element_by_class_name('SymbolDescription').text.encode('utf-8').strip()
+                            type = "postponed"
+
+                        elif index == 2:    # Holiday
+                            descr = row.find_element_by_class_name('ColumnHoliday1').text.encode('utf-8').strip()
+                            type = "holiday"
+
+
+                        if descr != '':
+                            year = current_year+1 if month_id < datetime.datetime.now().month else current_year
+
+                            dic = {
+                                "date": str(datetime.date(year, month_id, int(date))),
+                                "wd": wd,
+                                "descr": descr,
+                                "type": type
+                            }
+
+                            arr.append(dic)
 
                 disposals[street_name][month] = arr
                 end = time.time()
