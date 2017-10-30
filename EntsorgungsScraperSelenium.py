@@ -43,7 +43,7 @@ def scrape(start_index, last_index):
         binary = FirefoxBinary('/Applications/Firefox Beta.app/Contents/MacOS/firefox', log_file=sys.stdout)
         binary.add_command_line_options('-headless')
         driver = webdriver.Firefox(firefox_binary=binary)
-        driver.set_window_size(640, 480)
+        #driver.set_window_size(640, 480)
 
         #options = webdriver.ChromeOptions()
         #options.add_argument('headless')
@@ -104,7 +104,7 @@ def scrape(start_index, last_index):
 
                 print "\t...scraping " + month
 
-                waiting()
+                # waiting()
 
                 arr = []
                 for index, xpath_selector in enumerate(XPATH_SELECTORS):
