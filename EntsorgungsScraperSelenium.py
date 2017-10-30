@@ -62,6 +62,10 @@ def scrape(start_index, last_index):
 
         street_index_pointer = -1
         for street_index in range(start_index, last_index):
+            if street_index % 2 == 0:
+                print "init new driver"
+                driver = webdriver.Firefox(firefox_binary=binary)
+
             street_index_pointer = street_index
 
             driver.get(url)
