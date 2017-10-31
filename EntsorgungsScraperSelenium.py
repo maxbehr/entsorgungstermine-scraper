@@ -21,6 +21,7 @@ url = 'https://potsdam.abfuhrkalender.de/default.aspx'
 months_btn_ids = ['btMCMonth1', 'btMCMonth2', 'btMCMonth3', 'btMCMonth4', 'btMCMonth5', 'btMCMonth6', 'btMCMonth7', 'btMCMonth8', 'btMCMonth9', 'btMCMonth10', 'btMCMonth11', 'btMCMonth12']
 
 PATH = "/Users/max/Developer/Abfallentsorgung/www_revamped/scraped_streets/"
+SCRAPED_STREETS_FILE_NAME = "_streetnames.json";
 
 XPATH_SELECTORS = [
     '//*[@id="pnlMonthCalendarDays"]/div[@class="RowStandard"]',
@@ -31,27 +32,88 @@ XPATH_SELECTORS = [
 
 start_index = 0
 amount_streets = 1042
-time_to_wait = 1
+time_to_wait = 0
 
 current_year = datetime.datetime.now().year
 
-def scrape(start_index, last_index):
-    try:
-        global driver
-        #options = webdriver.FirefoxProfile()
-        os.environ['MOZ_HEADLESS'] = '1'
-        binary = FirefoxBinary('/Applications/Firefox Beta.app/Contents/MacOS/firefox', log_file=sys.stdout)
-        binary.add_command_line_options('-headless')
-        driver = webdriver.Firefox(firefox_binary=binary)
-        #driver.set_window_size(640, 480)
+driver = None
+binary = None
+streets = []
 
-        #options = webdriver.ChromeOptions()
-        #options.add_argument('headless')
-        # options.add_argument('--ignore-certificate-errors')
-        # options.add_argument("--test-type")
-        #options.add_argument('window-size=1200x600')
-        #options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-        #driver = webdriver.Chrome(chrome_options=options)
+def init_webdriver():
+    global driver, binary
+
+    # options = webdriver.FirefoxProfile()
+    os.environ['MOZ_HEADLESS'] = '1'
+    binary = FirefoxBinary('/Applications/Firefox Beta.app/Contents/MacOS/firefox', log_file=sys.stdout)
+    binary.add_command_line_options('-headless')
+    driver = webdriver.Firefox(firefox_binary=binary)
+    # driver.set_window_size(640, 480)
+
+    # options = webdriver.ChromeOptions()
+    # options.add_argument('headless')
+    # options.add_argument('--ignore-certificate-errors')
+    # options.add_argument("--test-type")
+    # options.add_argument('window-size=1200x600')
+    # options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    # driver = webdriver.Chrome(chrome_options=options)
+
+def scrape_streets():
+    """Scrapes all street names and saved them into a JSON file."""
+
+    global driver, binary, streets
+    init_webdriver()
+
+    print "Start scraping street names"
+    streets = []
+    driver = webdriver.Firefox(firefox_binary=binary)
+
+    driver.get(url)
+    assert "Abfuhrkalender der Landeshauptstadt Potsdam" in driver.title
+
+    adapt_dropdown_ortsteil(driver)
+    wait = WebDriverWait(driver, 10)
+    element = wait.until(EC.element_to_be_clickable((By.ID, 'ddStrasse')))
+    options = element.find_elements_by_xpath('//*[@id="ddStrasse"]/option')
+
+    for option in options:
+        street = option.text
+        if len(street.strip()) > 0:
+            streets.append(street)
+
+    write_to_file(PATH + SCRAPED_STREETS_FILE_NAME, streets)
+
+
+def adapt_dropdown_ortsteil(driver):
+    """Adapts the dropdown menu for 'Ortsteil' to 'All'."""
+
+    # Change Ortsteil
+    element = driver.find_element_by_xpath('//*[@id="ddOrtsteil"]')
+    options = element.find_elements_by_tag_name('option')
+
+    for option in options:
+        if option.get_attribute('value') == '-1':
+            option.click()
+            break
+
+def adapt_dropdown_street(driver, street_index):
+    """Adapts the dropdown menu for 'Streets'."""
+
+    wait = WebDriverWait(driver, 10)
+    element = wait.until(EC.element_to_be_clickable((By.ID, 'ddStrasse')))
+    option = element.find_element_by_xpath('//*[@id="ddStrasse"]/option[@value="' + str(street_index) + '"]')
+    street_name = option.text
+    option.click()
+    # amount_streets = len(options) - 1 # minus 1 because one empty option inside the select
+    # print str(amount_streets) + " Streets"
+
+    return street_name
+
+def scrape(start_index, last_index):
+    """Scrapes all Entsorgungstermine for all months and all streets."""
+    try:
+        global driver, binary
+        init_webdriver()
 
         print "Start scraping with street_index " + str(start_index) + ", stop at index " + str(last_index) + " (inclusive)"
 
@@ -64,6 +126,7 @@ def scrape(start_index, last_index):
         for street_index in range(start_index, last_index):
             if street_index % 2 == 0:
                 print "init new driver"
+                driver.close()
                 driver = webdriver.Firefox(firefox_binary=binary)
 
             street_index_pointer = street_index
@@ -72,22 +135,10 @@ def scrape(start_index, last_index):
             assert "Abfuhrkalender der Landeshauptstadt Potsdam" in driver.title
 
             # Change Ortsteil
-            element = driver.find_element_by_xpath('//*[@id="ddOrtsteil"]')
-            options = element.find_elements_by_tag_name('option')
-
-            for option in options:
-                if option.get_attribute('value') == '-1':
-                    option.click()
-                    break
+            adapt_dropdown_ortsteil(driver)
 
             # Wait until drop down is enabled
-            wait = WebDriverWait(driver, 10)
-            element = wait.until(EC.element_to_be_clickable((By.ID,'ddStrasse')))
-            option = element.find_element_by_xpath('//*[@id="ddStrasse"]/option[@value="'+ str(street_index) +'"]')
-            street_name = option.text
-            option.click()
-            #amount_streets = len(options) - 1 # minus 1 because one empty option inside the select
-            #print str(amount_streets) + " Streets"
+            street_name = adapt_dropdown_street(driver, street_index)
 
             disposals = {}
             disposals[street_name]= {}
@@ -153,7 +204,9 @@ def scrape(start_index, last_index):
             disposals_all.append(disposals)
 
             # Write to single street file
-            with open(PATH + str(street_index) + " " + street_name +'.txt', 'w') as outfile:
+            output_filename = str(street_index) + " " + street_name +'.txt'
+            with open(PATH + output_filename, 'w') as outfile:
+                print "Write data to file '" + output_filename + "'"
                 json.dump(disposals, outfile)
 
             # Choose a new street
@@ -170,6 +223,11 @@ def scrape(start_index, last_index):
         print "StaleElementReferenceException... start over with index " + str(street_index_pointer) + " as start_index and " + str(last_index) + " as last_index"
         scrape(street_index_pointer, last_index)
 
+def write_to_file(file_path, content):
+    """Writes the given content to the given file."""
+    with open(file_path, 'w') as outfile:
+        print "Write data to file '" + file_path + "'"
+        json.dump(content, outfile)
 
 def waiting():
     time.sleep(time_to_wait)
@@ -177,11 +235,19 @@ def waiting():
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        scrape(sys.argv[1], sys.argv[2])
-    else:
-        scrape(1, 10)
+    scrape_streets()
 
+    amount_streets = len(streets)
+
+    if len(sys.argv) > 1:
+        start = sys.argv[1]
+        end = sys.argv[2]
+    else:
+        start = 1
+        end = amount_streets
+
+    print "Start scraping from " + str(start) + " to " + str(end)
+    scrape(start, end)
 
 
 
